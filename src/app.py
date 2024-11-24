@@ -29,7 +29,7 @@ def graficar(train, pre, accion, dias):
 
     # Separar datos históricos y futuros
     fecha_maxima = train['ds'].max()
-    future_start_date = fecha_maxima + timedelta(days=1)
+    future_start_date = fecha_maxima + timedelta(days=dias)
 
     historical = pre[pre['ds'] <= fecha_maxima]
     future = pre[pre['ds'] >= future_start_date]
@@ -53,9 +53,25 @@ def graficar(train, pre, accion, dias):
 
     st.pyplot(fig)
 
+def graficar_predicciones(predicciones, accion):
+    """Genera un gráfico de las predicciones para los días solicitados."""
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    # Predicciones seleccionadas
+    ax.plot(predicciones['ds'], predicciones['yhat'], marker='o', label='Predicción')
+
+    # Configuración del gráfico
+    ax.set_title(f"Predicción para {accion} (días futuros)", fontsize=14)
+    ax.set_xlabel('Fecha', fontsize=14)
+    ax.set_ylabel('Valor Predicho', fontsize=14)
+    ax.tick_params(axis='x', rotation=90)
+    ax.legend()
+
+    st.pyplot(fig)
+
 # Interfaz de usuario
 st.write("Selecciona la cantidad de días y activo que quieras visualizar")
-dias = st.slider("Número de días", 1, 30)
+dias = st.slider("Número de días", 1, 10)
 accion = st.selectbox('Activo', ['VTI', 'ORO', 'BTC'])
 
 if st.button("Predecir"):
@@ -79,13 +95,23 @@ if st.button("Predecir"):
         # Hacer predicciones
         prediction = model.predict(future)
 
-        # Mostrar fechas de predicción
+        # Filtrar las predicciones para los días futuros seleccionados
         fecha_maxima = train['ds'].max()
-        fecha_corte = pd.to_datetime(fecha_maxima) + timedelta(days=dias)
+        future_predictions = prediction[prediction['ds'] > fecha_maxima].head(dias)
+
+        # Mostrar fechas de predicción
+        future_predictions['ds'] = future_predictions['ds'].dt.strftime('%Y-%m-%d')  # Formatear fechas
+        fecha_corte = (pd.to_datetime(fecha_maxima) + timedelta(days=dias)).strftime('%Y-%m-%d')
+
         st.write(f"La predicción incluye fechas desde {fecha_maxima} hasta {fecha_corte}.")
 
-        # Generar el gráfico
+        # Generar gráficos
         graficar(train, prediction, accion, dias)
+        graficar_predicciones(future_predictions, accion)
+
+        # Mostrar los valores predichos en una tabla
+        st.write(f"Valores Predichos para {accion}:")
+        st.dataframe(future_predictions[['ds', 'yhat']].rename(columns={'ds': 'Fecha', 'yhat': 'Valor Predicho'}))
 
     except FileNotFoundError as e:
         st.error(f"Error al cargar archivos: {e}")
